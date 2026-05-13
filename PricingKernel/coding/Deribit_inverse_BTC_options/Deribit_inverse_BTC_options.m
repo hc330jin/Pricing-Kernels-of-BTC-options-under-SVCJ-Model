@@ -7,6 +7,7 @@ clc; clear all; close all;
 
 %% ===== Load Deribit Option Data =====
 
+% Time range from 2021/01/01 to 2022/01/31
 filename = 'Deribit_20210101_20220131.csv';
 
 T = readtable(filename);
@@ -59,58 +60,61 @@ DTM = days(T.maturity - T.date);
 T.DTM = DTM;
 
 tau = DTM / 365;
-T.tau = tau
+T.tau = tau;
 
 % Moneyness
 moneyness = index_price ./ strike;
-T.moneyness = moneyness
+T.moneyness = moneyness;
 
 % Maximum Maturity
 nDay_max = max(DTM);
 
-disp("Data loading complete!\n")
+disp("Data loading complete!")
 
 %% ======= Setting common random numbers =======
-n = 50; % Monte Carlo sample size
-disp('Start setting common random numbers...\n')
-U_base = unifrnd(0, 1, [2*n,  nDay_max]);
-Z_base = normrnd(0, 1, [3*n, nDay_max]);
-disp('Done!')
+% n = 50; % Monte Carlo sample size
+% disp('Start setting common random numbers...\n')
+% U_base = unifrnd(0, 1, [2*n,  nDay_max]);
+% Z_base = normrnd(0, 1, [3*n, nDay_max]);
+% disp('Done!')
 %% ======= Construct Unique Contracts =======
-disp('Start construct unique contracts...\n')
-contract_table = table( ...
-    T.omega, ...
-    T.DTM, ...
-    T.strike, ...
-    T.index_price, ...
-    'VariableNames', {'omega','DTM','strike','index_price'} ...
-);
-[contract_base_table, ia, ic] = unique(contract_table, 'rows', 'stable');
-
-n_base = height(contract_base_table);
-
-omega_base       = contract_base_table.omega;
-maturity_base    = contract_base_table.DTM;          % t = T, in days
-strike_base      = contract_base_table.strike;
-index_price_base = contract_base_table.index_price;
-d_base           = zeros(n_base, 1);                 % t = 0
-
-p = T.p;
-disp('Done!')
-
+% disp('Start construct unique contracts...\n')
+% contract_table = table( ...
+%     T.omega, ...
+%     T.DTM, ...
+%     T.strike, ...
+%     T.index_price, ...
+%     'VariableNames', {'omega','DTM','strike','index_price'} ...
+% );
+% [contract_base_table, ia, ic] = unique(contract_table, 'rows', 'stable');
+% 
+% n_base = height(contract_base_table);
+% 
+% omega_base       = contract_base_table.omega;
+% maturity_base    = contract_base_table.DTM;          % t = T, in days
+% strike_base      = contract_base_table.strike;
+% index_price_base = contract_base_table.index_price;
+% d_base           = zeros(n_base, 1);                 % t = 0
+% 
+% p = T.p;
+% disp('Done!')
+% 
 
 %% ======= Daily Calibration: BS Model =======
 curr_model = 'BS';
-folder_name = sprintf('%s_calibration', curr_model);
+
+unique_dates = unique(T.date);
+n_dates = length(unique_dates);
+
+mc_size = 50; % Monte Carlo sample size
+
+folder_name = sprintf('%s_calibration_%dpaths', curr_model, mc_size);
+
 % Ensure folder exists
 if ~exist(folder_name, 'dir')
     mkdir(folder_name);
 end
 
-unique_dates = unique(T.date);
-n_dates = length(unique_dates);
-
-n = 50; % Monte Carlo sample size
 
 result_BS = table( ...
     unique_dates, ...
@@ -143,8 +147,8 @@ for k = 1:n_dates
 
     rng(114514);
 
-    U_base_day = unifrnd(0, 1, [2*n, nDay_max_day]);
-    Z_base_day = normrnd(0, 1, [3*n, nDay_max_day]);
+    U_base_day = unifrnd(0, 1, [2*mc_size, nDay_max_day]);
+    Z_base_day = normrnd(0, 1, [3*mc_size, nDay_max_day]);
 
     %% ===== Construct unique contracts for this day =====
     contract_table_day = table( ...
@@ -166,7 +170,6 @@ for k = 1:n_dates
     index_price_base_day = contract_base_table_day.index_price;
     d_base_day           = zeros(n_base_day, 1);
 
-    %% ===== Task 1: Calibrate BS model for this day =====
     curr_model = 'BS';
     param0 = 0.0267;
 
@@ -186,7 +189,7 @@ for k = 1:n_dates
     end
 
     fun = @(param)obj_fminsearch( ...
-        param, curr_model, n, U_base_day, Z_base_day, p_day, ...
+        param, curr_model, mc_size, U_base_day, Z_base_day, p_day, ...
         index_price_base_day, omega_base_day, d_base_day, ...
         maturity_base_day, strike_base_day, ic_day ...
     );
@@ -229,24 +232,29 @@ set(gcf,'color','none');
 set(gca,'color','none');
 export_fig(fullfile(folder_name, 'Daily calibrated BS implied volatility'), '-png', '-transparent', '-r300', '-opengl');
 close(fig);
+fprintf('BS Model Calibration Done!')
 
-% ===== 
+%% ===== Analysis of BS =====
 
+analyze_Q_results(curr_model, mc_size);
 
 
 
 %% ======= Daily Calibration: SV Model =======
 curr_model = 'SV';
-folder_name = sprintf('%s_calibration', curr_model);
-
-if ~exist(folder_name, 'dir')
-    mkdir(folder_name);
-end
 
 unique_dates = unique(T.date);
 n_dates = length(unique_dates);
 
-n = 50; % Monte Carlo sample size
+mc_size = 50; % Monte Carlo sample size
+
+folder_name = sprintf('%s_calibration_%dpaths', curr_model, mc_size);
+
+% Ensure folder exists
+if ~exist(folder_name, 'dir')
+    mkdir(folder_name);
+end
+
 
 result_SV = table( ...
     unique_dates, ...
@@ -275,8 +283,8 @@ for k = 1:n_dates
 
     rng(114514);
 
-    U_base_day = unifrnd(0, 1, [2*n, nDay_max_day]);
-    Z_base_day = normrnd(0, 1, [3*n, nDay_max_day]);
+    U_base_day = unifrnd(0, 1, [2*mc_size, nDay_max_day]);
+    Z_base_day = normrnd(0, 1, [3*mc_size, nDay_max_day]);
 
     contract_table_day = table( ...
         T_day.omega, ...
@@ -316,17 +324,19 @@ for k = 1:n_dates
             'Algorithm', 'trust-region-reflective', ...
             'Display', 'iter', ...
             'FunctionTolerance', 1e-8, ...
+            'MaxIterations', 50, ...
             'StepTolerance', 1e-6);
     else
         options = optimoptions(@lsqnonlin, ...
             'Algorithm', 'trust-region-reflective', ...
             'Display', 'off', ...
             'FunctionTolerance', 1e-8, ...
+            'MaxIterations', 50, ...
             'StepTolerance', 1e-6);
     end
 
     fun = @(param)obj_lsqnonlin( ...
-        param, curr_model, n, p_day, U_base_day, Z_base_day, ...
+        param, curr_model, mc_size, p_day, U_base_day, Z_base_day, ...
         index_price_base_day, omega_base_day, d_base_day, ...
         maturity_base_day, strike_base_day, ic_day ...
     );
@@ -369,56 +379,170 @@ export_fig(fullfile(folder_name, 'Daily calibrated SV implied V0'), ...
     '-png', '-transparent', '-r300', '-opengl');
 close(fig);
 
+%% ===== Analysis of SV =====
 
-%% Task 3: calibrate the SVJ model
+analyze_Q_results(curr_model, mc_size);
+
+
+%% ======= Daily Calibration: SVJ Model =======
 curr_model = 'SVJ';
-param0 = [0.0003   -0.1705   -0.0000   -4.9991    0.0000    1.9627    0.2340    0.0035    0.0792]; % initial value
-options = optimoptions(@lsqnonlin, 'Algorithm', 'levenberg-marquardt', 'Display', 'iter');
-fun = @(param)obj_lsqnonlin(param, curr_model, n, p, U_base, Z_base, index_price_base, omega_base, d_base, maturity_base, strike_base, ic);
-lb = -5 * ones(9,1);
-ub =  5 * ones(9,1);
-lb(2) = -1;% -1 < rho <1
-lb(3) = 0; % alpha > 0
-lb(5) = 0; % V0 > 0
-lb(6) = 0; % sigma_v > 0
-ub(2) = 1;% -1 < rho <1
-ub(4) = 1; % beta<1
-lb(7) = 0; % 0<lambda <1
-lb(9) = 0; % sigma_y >0
-ub(7) = 1; % 0<lambda <1
-[param, resnorm, residual, exitflag, output] = lsqnonlin(fun, param0, lb, ub,options);
 
-%% Task 4: calibrate the SVCJ model
-% curr_model = 'SVCJ';
-% param0 = [-0.0002   -0.8922    0.0025   -2.0661    0.0025    0.0603    0.0067    0.1010   -1.0588    0.0212    0.0000]; % initial param0
-% options = optimoptions(@lsqnonlin, 'Algorithm', 'levenberg-marquardt', 'Display', 'iter');
-% fun = @(param)obj_lsqnonlin(param, curr_model, n, p, U_base, Z_base, index_price_base, omega_base, d_base, maturity_base, strike_base, ic);
-% lb = -5 * ones(11,1);
-% ub =  5 * ones(11,1);
-% lb(2) = -1;% -1 < rho <1
-% lb(3) = 0; % alpha > 0
-% lb(5) = 0; % V0 > 0
-% lb(6) = 0; % sigma_v > 0
-% ub(2) = 1;% -1 < rho <1
-% ub(4) = 1; % beta<1
-% lb(7) = 0; % 0<lambda <1
-% ub(7) = 1; % 0<lambda <1
-% lb(10) = 0; % sigma_y >0
-% lb(11) = 0; % mu_v >0
-% [param, resnorm, residual, exitflag, output] = lsqnonlin(fun, param0, lb, ub,options);
+unique_dates = unique(T.date);
+n_dates = length(unique_dates);
 
-%% ======= Daily Calibration: SVCJ Model =======
-curr_model = 'SVCJ';
-folder_name = sprintf('%s_calibration', curr_model);
+mc_size = 50;
+
+folder_name = sprintf('%s_calibration_%dpaths', curr_model, mc_size);
 
 if ~exist(folder_name, 'dir')
     mkdir(folder_name);
 end
 
+result_SVJ = table( ...
+    unique_dates, ...
+    nan(n_dates,1), nan(n_dates,1), nan(n_dates,1), ...
+    nan(n_dates,1), nan(n_dates,1), nan(n_dates,1), ...
+    nan(n_dates,1), nan(n_dates,1), nan(n_dates,1), ...
+    nan(n_dates,1), nan(n_dates,1), nan(n_dates,1), ...
+    nan(n_dates,1), ...
+    'VariableNames', {'date','mu','rho','alpha','beta','V0','sigma_v', ...
+                      'lambda','mu_y','sigma_y', ...
+                      'SSE_SVJ','RMSE_SVJ','n_obs','n_contract'} ...
+);
+
+for k = 1:n_dates
+
+    current_date = unique_dates(k);
+    fprintf('\n===== Calibrating SVJ date: %s =====\n', string(current_date));
+
+    T_day = T(T.date == current_date, :);
+
+    if height(T_day) == 0
+        continue;
+    end
+
+    p_day = T_day.p;
+
+    nDay_max_day = max(T_day.DTM);
+
+    rng(114514);
+
+    U_base_day = unifrnd(0, 1, [2*mc_size, nDay_max_day]);
+    Z_base_day = normrnd(0, 1, [3*mc_size, nDay_max_day]);
+
+    contract_table_day = table( ...
+        T_day.omega, ...
+        T_day.DTM, ...
+        T_day.strike, ...
+        T_day.index_price, ...
+        'VariableNames', {'omega','DTM','strike','index_price'} ...
+    );
+
+    [contract_base_table_day, ia_day, ic_day] = ...
+        unique(contract_table_day, 'rows', 'stable');
+
+    n_base_day = height(contract_base_table_day);
+
+    omega_base_day       = contract_base_table_day.omega;
+    maturity_base_day    = contract_base_table_day.DTM;
+    strike_base_day      = contract_base_table_day.strike;
+    index_price_base_day = contract_base_table_day.index_price;
+    d_base_day           = zeros(n_base_day, 1);
+
+    param0 = [ ...
+        0.0003   -0.1705   -0.0000   -4.9991    0.0000 ...
+        1.9627    0.2340    0.0035    0.0792 ...
+    ];
+
+    lb = -5 * ones(9,1);
+    ub =  5 * ones(9,1);
+
+    lb(2) = -1;
+    ub(2) =  1;
+
+    lb(3) = 0;
+    lb(5) = 0;
+    lb(6) = 0;
+
+    ub(4) = 1;
+
+    lb(7) = 0;
+    ub(7) = 1;
+
+    lb(9) = 0;
+
+    if k == 1
+        options = optimoptions(@lsqnonlin, ...
+            'Algorithm', 'trust-region-reflective', ...
+            'Display', 'iter', ...
+            'FunctionTolerance', 1e-8, ...
+            'MaxIterations', 50, ...
+            'StepTolerance', 1e-6);
+    else
+        options = optimoptions(@lsqnonlin, ...
+            'Algorithm', 'trust-region-reflective', ...
+            'Display', 'off', ...
+            'FunctionTolerance', 1e-8, ...
+            'MaxIterations', 50, ...
+            'StepTolerance', 1e-6);
+    end
+
+    fun = @(param)obj_lsqnonlin( ...
+        param, curr_model, mc_size, p_day, U_base_day, Z_base_day, ...
+        index_price_base_day, omega_base_day, d_base_day, ...
+        maturity_base_day, strike_base_day, ic_day ...
+    );
+
+    tic;
+
+    [param_SVJ_day, resnorm_SVJ_day, residual_SVJ_day, exitflag_SVJ_day, output_SVJ_day] = ...
+        lsqnonlin(fun, param0, lb, ub, options);
+
+    elapsed_time = toc;
+
+    result_SVJ.mu(k)         = param_SVJ_day(1);
+    result_SVJ.rho(k)        = param_SVJ_day(2);
+    result_SVJ.alpha(k)      = param_SVJ_day(3);
+    result_SVJ.beta(k)       = param_SVJ_day(4);
+    result_SVJ.V0(k)         = param_SVJ_day(5);
+    result_SVJ.sigma_v(k)    = param_SVJ_day(6);
+    result_SVJ.lambda(k)     = param_SVJ_day(7);
+    result_SVJ.mu_y(k)       = param_SVJ_day(8);
+    result_SVJ.sigma_y(k)    = param_SVJ_day(9);
+
+    result_SVJ.SSE_SVJ(k)     = resnorm_SVJ_day;
+    result_SVJ.RMSE_SVJ(k)    = sqrt(resnorm_SVJ_day / length(p_day));
+    result_SVJ.n_obs(k)       = length(p_day);
+    result_SVJ.n_contract(k)  = n_base_day;
+
+    fprintf('Date = %s | RMSE = %.6f | time = %.2f sec\n', ...
+        string(current_date), result_SVJ.RMSE_SVJ(k), elapsed_time);
+
+end
+
+writetable(result_SVJ, fullfile(folder_name, 'daily_SVJ_calibration.csv'));
+
+fig = figure;
+plot(result_SVJ.date, result_SVJ.lambda, '-o');
+xlabel('Date');
+ylabel('SVJ implied lambda');
+title('Daily calibrated SVJ implied lambda');
+
+set(gcf,'color','none');
+set(gca,'color','none');
+export_fig(fullfile(folder_name, 'Daily calibrated SVJ implied lambda'), ...
+    '-png', '-transparent', '-r300', '-opengl');
+close(fig);
+
+%% ======= Daily Calibration: SVCJ Model =======
+curr_model = 'SVCJ';
+
 unique_dates = unique(T.date);
 n_dates = length(unique_dates);
 
-n = 50;
+mc_size = 50;
+
+folder_name = sprintf('%s_calibration_%dpaths', curr_model, mc_size);
 
 result_SVCJ = table( ...
     unique_dates, ...
@@ -450,8 +574,8 @@ for k = 1:n_dates
 
     rng(114514);
 
-    U_base_day = unifrnd(0, 1, [2*n, nDay_max_day]);
-    Z_base_day = normrnd(0, 1, [3*n, nDay_max_day]);
+    U_base_day = unifrnd(0, 1, [2*mc_size, nDay_max_day]);
+    Z_base_day = normrnd(0, 1, [3*mc_size, nDay_max_day]);
 
     contract_table_day = table( ...
         T_day.omega, ...
@@ -515,7 +639,7 @@ for k = 1:n_dates
     end
 
     fun = @(param)obj_lsqnonlin( ...
-        param, curr_model, n, p_day, U_base_day, Z_base_day, ...
+        param, curr_model, mc_size, p_day, U_base_day, Z_base_day, ...
         index_price_base_day, omega_base_day, d_base_day, ...
         maturity_base_day, strike_base_day, ic_day ...
     );
