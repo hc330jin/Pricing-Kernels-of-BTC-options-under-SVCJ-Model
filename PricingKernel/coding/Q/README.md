@@ -1,20 +1,21 @@
-<div style="margin: 0; padding: 0; text-align: center; border: none;">
-<a href="https://quantlet.com" target="_blank" style="text-decoration: none; border: none;">
-<img src="https://github.com/StefanGam/test-repo/blob/main/quantlet_design.png?raw=true" alt="Header Image" width="100%" style="margin: 0; padding: 0; display: block; border: none;" />
-</a>
-</div>
+* Ref: https://github.com/QuantLet/Deribit_inverse_BTC_options/tree/main
+* Code Revision: Chin HSU (hc330.sc14@nycu.edu.tw)
+# Q
+## Main functions
+| Index | Filename | Description |
+| -------- | -------- | -------- |
+| 1     | ```Deribit_inverse_BTC_options.m```     | Main file to estimate Q parameters|
+|2|```estimate_Q_results.m```|Calculate descriptive statistics for Q parameters|
+|3|```estimate_one_pk.m```|Main file to estimate density of p, q and pricing kernel|
 
-```
-Name of Quantlet: Deribit_inverse_BTC_options
-
-Published in: Pricing and hedging inverse BTC options
-
-Description: We focus on the inverse BTC options traded in Deribit and provide codes to calibrate the BS, SV, SVJ, and SVCJ models and to calculate their deltas.
-
-Keywords: Bitcoin, Deribit, stocahstic volatility, jump, dynamic delta hedge, options
-
-Author: Huei-Wen Teng, Wolfgang Haerdle
-
-Submitted: 2022.09.06
-
-```
+## List of other functions
+| Index | Filename | Decription |
+| ------- | ------- | -------|
+|1|```obj_fminsearch.m```|Minimize loss function for BS model|
+|2|```obj_lsqnonlin.m```|Minimize loss function for SV, SVJ, SVCJ model|
+|3|```calc_inverse.m```|To generate a price time series by estimated parameters|
+|4|```calc_BS_inverse.m```|To calculate option price by BS formula|
+|5|```get_SV.m```|Generate return and volatility path for SV model|
+|6|```get_SVJ.m```|Generate return and volatility path for SVJ model|
+|7|```get_SVCJ.m```|Generate return and volatility path for SVCJ model|
+|8|```calc_payoff_inverse.m```|To calculate option price by from return series|
