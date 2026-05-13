@@ -1,6 +1,7 @@
 %% 
 % filename: test_whole__data_param.m
 % Written by Wendy Huang on 20250210
+% Modify by Chris on 2026/05/13
 
 close all;
 clear all;
@@ -16,7 +17,7 @@ control.num_paths = 1000;
 control.dt = 1;
 control.SMALL = 1e-10;
 control.Alpha = 0.05;
-%% ======= Setting Control ========
+
 
 %% ======= Loading Data ========
 data = readtable("whole_data.csv");
@@ -42,7 +43,7 @@ asset_to_estimate = 'BITCOIN'; % <-- Here to modify asset
 no_asset = assetMap(asset_to_estimate);
 
 prices_filtered = price.numericData(mask, no_asset);
-Returns_all = 100 * diff(log(prices_filtered)); % Daily return
+Returns_all = diff(log(prices_filtered)); % Daily return
 
 % Returns_all=(prices(2:end)-prices(1:end-1)) ./prices(1:end-1);
 
@@ -51,7 +52,6 @@ dates_filtered = date_col(mask);
 
 N = 1;
 s = asset_to_estimate;
-%% ======= Loading Data ========
 
 %% ======= Save Setting ========
 % Create folder
@@ -65,7 +65,6 @@ end
 filename_mat = fullfile(folder_name, sprintf('%s_%d_mcmc_results_%s_%d.mat', control.model, control.num_MCMC, s, N));
 
 
-%% ======= Save Setting ========
 
 %% ======= MCMC Setting ========
 % Returns = Returns_all(N:N+steps-1);
@@ -86,39 +85,82 @@ control.H = length(Returns_all);
 param = define_param(control.model);
 
 control = define_flag(control);
-%% ======= MCMC Setting ========
+
 
 %% ======= RUNNING MCMC ========
 tic
 outputs = run_MCMC(control, param, Y, mySelf);
 toc
-%% ======= RUNNING MCMC ========
+
 
 %% ======= Writing Table =======
 
-% T: Parameters (Posterior mean) to parameters.csv
+% T: Parameters trace (after burn-in)
 T=table(outputs.V0_trace',outputs.mu_trace' ,outputs.alpha_trace' ,outputs.beta_trace' ,outputs.sigma_v_trace',...
 outputs.mu_y_trace',outputs.sigma_y_trace',outputs.rho_trace',outputs.rho_j_trace',outputs.mu_v_trace',...
 outputs.lambda_trace', outputs.LL_trace_last');
-T.Properties.VariableNames = {'V0', 'mu', 'alpha', 'beta', 'sigma2_v', 'mu_y', 'sigma2_y', 'rho', 'rho_j', 'mu_v', 'lambda', 'LL'};
-writetable(T, fullfile(folder_name,'parameters.csv'));
+T.Properties.VariableNames = {'V0', 'mu', 'alpha', 'beta', 'sigma_v', 'mu_y', 'sigma_y', 'rho', 'rho_j', 'mu_v', 'lambda', 'LL'};
+writetable(T, fullfile(folder_name,'p_parameters_trace.csv'));
 
-% T1: Trace to sum.csv
+
+% T_tmp: save one P-measure posterior mean for all 90 days
+
+% 90-day dates
+date_p = dates_filtered;   % size should be 90 x 1
+
+% Posterior means after burn-in / final posterior mean
+V0_p       = outputs.V0;
+mu_p       = outputs.mu;
+alpha_p    = outputs.alpha;
+beta_p     = outputs.beta;
+sigma_v_p  = outputs.sigma_v;
+mu_y_p     = outputs.mu_y;
+sigma_y_p  = outputs.sigma_y;
+rho_p      = outputs.rho;
+rho_j_p    = outputs.rho_j;
+mu_v_p     = outputs.mu_v;
+lambda_p   = outputs.lambda;
+
+% Repeat the same posterior mean for each date
+n_dates = length(date_p);
+
+T_tmp = table( ...
+    date_p, ...
+    repmat(mu_p,      n_dates, 1), ...
+    repmat(rho_p,     n_dates, 1), ...
+    repmat(alpha_p,   n_dates, 1), ...
+    repmat(beta_p,    n_dates, 1), ...
+    repmat(V0_p,      n_dates, 1), ...
+    repmat(sigma_v_p, n_dates, 1), ...
+    repmat(lambda_p,  n_dates, 1), ...
+    repmat(mu_y_p,    n_dates, 1), ...
+    repmat(rho_j_p,   n_dates, 1), ...
+    repmat(sigma_y_p, n_dates, 1), ...
+    repmat(mu_v_p,    n_dates, 1), ...
+    'VariableNames', {'date','mu','rho','alpha','beta','V0','sigma_v', ...
+                      'lambda','mu_y','rho_j','sigma_y','mu_v'} ...
+);
+
+writetable(T_tmp, fullfile(folder_name, 'p_parameter_tmp.csv'));
+
+
+
+% T1: parameters (posterior mean)
 T1=table(outputs.V0', outputs.mu', outputs.mu_y', outputs.sigma_y', ...
 outputs.lambda', outputs.alpha', outputs.beta', outputs.rho', ...
 outputs.sigma_v', outputs.rho_j', outputs.mu_v, outputs.LL);
-T1.Properties.VariableNames = {'V0', 'mu', 'mu_y', 'sigma2_y', 'lambda', 'alpha', 'beta', 'rho', 'sigma2_v', 'rho_j', 'mu_v', 'LL'};
-writetable(T1, fullfile(folder_name,'sum.csv'));
+T1.Properties.VariableNames = {'V0', 'mu', 'mu_y', 'sigma_y', 'lambda', 'alpha', 'beta', 'rho', 'sigma_v', 'rho_j', 'mu_v', 'LL'};
+writetable(T1, fullfile(folder_name,'p_parameter.csv'));
 
-% T2: Latent Variable to trace.csv
+% T2: Latent Variable to latent_trace.csv
 if strcmp(control.model, 'SVCJ')
     T2=table(outputs.V', outputs.J', outputs.ZY', outputs.ZV');
     T2.Properties.VariableNames = {'V', 'J', 'ZY', 'ZV'};
-    writetable(T2, fullfile(folder_name,'trace.csv'));
+    writetable(T2, fullfile(folder_name,'latent_trace.csv'));
 elseif strcmp(control.model, 'SV')
     T2=table(outputs.V');
     T2.Properties.VariableNames = {'V'};
-    writetable(T2, fullfile(folder_name,'trace.csv'));
+    writetable(T2, fullfile(folder_name,'latent_trace.csv'));
 end
 
 % T3: Return to return.csv
@@ -148,7 +190,7 @@ fprintf('Saved control for model %s in %s\n', control.model, filename_mat);
 % Save the outputs structure in mcmc_results.mat file
 save(filename_mat, 'outputs', '-append');
 fprintf('Saved outputs to %s\n', filename_mat);
-%% ======= Writing Table =======
+
 
 %% ======= Plotting =======
 % --- Visualization & Saving Trace Plots ---
@@ -235,11 +277,7 @@ function save_plot_func(data, title_str, fname, path)
 end
 %% ======= Plotting =======
 
-%% ======= Check result =======
-result = readtable(fullfile(folder_name, 'sum.csv'));
-disp(result)
 
-trace = readtable(fullfile(folder_name, 'parameters.csv'));
 %% ======= Check result =======
 
 
