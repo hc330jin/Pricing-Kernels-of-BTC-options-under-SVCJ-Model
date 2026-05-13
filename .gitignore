@@ -1,2 +1,6 @@
 .DS_Store
 PricingKernel/coding/Deribit_inverse_BTC_options/*.csv
+
+.DS_Store
+*.csv
+*.mat
