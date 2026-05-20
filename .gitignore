@@ -1,6 +1,14 @@
+# macOS
 .DS_Store
-PricingKernel/coding/Deribit_inverse_BTC_options/*.csv
 
-.DS_Store
-*.csv
+# MATLAB temporary
+*.asv
+
+# Large raw option data
+PricingKernel/coding/Q/Deribit_20210101_20220131.csv
+
+# Large outputs
 *.mat
+
+# Optional: ignore generated figures
+# *.png
