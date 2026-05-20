@@ -8,7 +8,7 @@ close all;
 
 %% ===== Settings =====
 
-q_file = fullfile('SVCJ_calibration_50paths', 'daily_SVCJ_calibration.csv');
+q_file = fullfile('SVCJ_calibration_50paths_par', 'daily_SVCJ_calibration.csv');
 p_file = fullfile('../P/SVCJ_100000_estimate_BITCOIN_1', 'p_parameter_tmp.csv');
 
 Q = readtable(q_file);

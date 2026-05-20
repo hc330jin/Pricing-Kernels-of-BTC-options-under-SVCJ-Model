@@ -2,7 +2,11 @@
 % written by Chin HSU on 2026/05/13
 % Descriptions: to analyze Q parameters just estimated
 
-function analyze_Q_results(model, mc_size)
+function analyze_Q_results(model, mc_size, para_or_not)
+
+if nargin < 3
+    para_or_not = '';
+end
 
 clc;
 close all;
@@ -82,7 +86,11 @@ end
 
 %% ===== Load Result =====
 
-folder_name = sprintf('%s_calibration_%dpaths', model, mc_size);
+if isempty(para_or_not)
+    folder_name = sprintf('%s_calibration_%dpaths', model, mc_size);
+else
+    folder_name = sprintf('%s_calibration_%dpaths_%s', model, mc_size, para_or_not);
+end
 
 input_file = fullfile(folder_name, result_file);
 
@@ -133,15 +141,15 @@ disp(summary_table);
 
 %% ===== Add kappa and theta for SV-type models =====
 
-if ismember(model, {'SV','SVJ','SVCJ'})
-
-    result.kappa = 1 - result.beta;
-
-    result.theta = result.alpha ./ result.kappa;
-
-    param_names = [param_names, {'kappa','theta'}];
-
-end
+% if ismember(model, {'SV','SVJ','SVCJ'})
+% 
+%     result.kappa = 1 - result.beta;
+% 
+%     result.theta = result.alpha ./ result.kappa;
+% 
+%     param_names = [param_names, {'kappa','theta'}];
+% 
+% end
 
 %% ===== Time Series Plot =====
 
@@ -178,35 +186,35 @@ end
 
 %% ===== Histogram =====
 
-for j = 1:length(param_names)
-
-    name = param_names{j};
-
-    fig = figure;
-
-    histogram(result.(name), 20);
-
-    xlabel(name, 'Interpreter', 'none');
-
-    ylabel('Frequency');
-
-    title(sprintf('Histogram of %s %s', ...
-        model, name), ...
-        'Interpreter', 'none');
-
-    grid on;
-
-    set(gcf,'color','none');
-    set(gca,'color','none');
-
-    export_fig( ...
-        fullfile(analysis_folder, ...
-        sprintf('Histogram_%s_%s', model, name)), ...
-        '-png', '-transparent', '-r300', '-opengl');
-
-    close(fig);
-
-end
+% for j = 1:length(param_names)
+% 
+%     name = param_names{j};
+% 
+%     fig = figure;
+% 
+%     histogram(result.(name), 20);
+% 
+%     xlabel(name, 'Interpreter', 'none');
+% 
+%     ylabel('Frequency');
+% 
+%     title(sprintf('Histogram of %s %s', ...
+%         model, name), ...
+%         'Interpreter', 'none');
+% 
+%     grid on;
+% 
+%     set(gcf,'color','none');
+%     set(gca,'color','none');
+% 
+%     export_fig( ...
+%         fullfile(analysis_folder, ...
+%         sprintf('Histogram_%s_%s', model, name)), ...
+%         '-png', '-transparent', '-r300', '-opengl');
+% 
+%     close(fig);
+% 
+% end
 
 %% ===== RMSE Time Series =====
 
@@ -221,7 +229,6 @@ ylabel(rmse_name, 'Interpreter', 'none');
 
 title(sprintf('%s calibration RMSE', model));
 
-grid on;
 
 set(gcf,'color','none');
 set(gca,'color','none');
@@ -235,51 +242,51 @@ close(fig);
 
 %% ===== Correlation Matrix =====
 
-if length(param_names) >= 2
-
-    X = result{:, param_names};
-
-    corr_mat = corr(X, 'Rows', 'pairwise');
-
-    corr_table = array2table(corr_mat, ...
-        'VariableNames', param_names, ...
-        'RowNames', param_names);
-
-    corr_filename = sprintf('%s_Q_parameter_correlation.csv', model);
-
-    writetable(corr_table, ...
-        fullfile(analysis_folder, corr_filename), ...
-        'WriteRowNames', true);
-
-    fig = figure;
-
-    imagesc(corr_mat);
-
-    colorbar;
-
-    axis equal tight;
-
-    xticks(1:length(param_names));
-    yticks(1:length(param_names));
-
-    xticklabels(param_names);
-    yticklabels(param_names);
-
-    xtickangle(45);
-
-    title(sprintf('%s parameter correlation matrix', model));
-
-    set(gcf,'color','none');
-    set(gca,'color','none');
-
-    export_fig( ...
-        fullfile(analysis_folder, ...
-        sprintf('%s_parameter_correlation_matrix', model)), ...
-        '-png', '-transparent', '-r300', '-opengl');
-
-    close(fig);
-
-end
+% if length(param_names) >= 2
+% 
+%     X = result{:, param_names};
+% 
+%     corr_mat = corr(X, 'Rows', 'pairwise');
+% 
+%     corr_table = array2table(corr_mat, ...
+%         'VariableNames', param_names, ...
+%         'RowNames', param_names);
+% 
+%     corr_filename = sprintf('%s_Q_parameter_correlation.csv', model);
+% 
+%     writetable(corr_table, ...
+%         fullfile(analysis_folder, corr_filename), ...
+%         'WriteRowNames', true);
+% 
+%     fig = figure;
+% 
+%     imagesc(corr_mat);
+% 
+%     colorbar;
+% 
+%     axis equal tight;
+% 
+%     xticks(1:length(param_names));
+%     yticks(1:length(param_names));
+% 
+%     xticklabels(param_names);
+%     yticklabels(param_names);
+% 
+%     xtickangle(45);
+% 
+%     title(sprintf('%s parameter correlation matrix', model));
+% 
+%     set(gcf,'color','none');
+%     set(gca,'color','none');
+% 
+%     export_fig( ...
+%         fullfile(analysis_folder, ...
+%         sprintf('%s_parameter_correlation_matrix', model)), ...
+%         '-png', '-transparent', '-r300', '-opengl');
+% 
+%     close(fig);
+% 
+% end
 
 %% ===== Diagnostics =====
 

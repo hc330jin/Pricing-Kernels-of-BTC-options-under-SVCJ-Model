@@ -1,6 +1,6 @@
 %% 
 % filename: test_whole__data_param.m
-% Written by Wendy Huang on 20250210
+% Original written by Wendy Huang
 % Modify by Chris on 2026/05/13
 
 close all;
@@ -10,7 +10,7 @@ clc;
 % control.H = 90; % Use past H days
 % control.h = 28; % Estimate future h days
 control.model = 'SVCJ';
-control.num_MCMC = 100000; % # MCMC iterations
+control.num_MCMC = 200000; % # MCMC iterations
 control = define_flag(control);
 control.num_paths = 1000;
 % control.T = control.h; % Generate h days of return
@@ -95,61 +95,77 @@ toc
 
 %% ======= Writing Table =======
 
-% T: Parameters trace (after burn-in)
-T=table(outputs.V0_trace',outputs.mu_trace' ,outputs.alpha_trace' ,outputs.beta_trace' ,outputs.sigma_v_trace',...
-outputs.mu_y_trace',outputs.sigma_y_trace',outputs.rho_trace',outputs.rho_j_trace',outputs.mu_v_trace',...
-outputs.lambda_trace', outputs.LL_trace_last');
-T.Properties.VariableNames = {'V0', 'mu', 'alpha', 'beta', 'sigma_v', 'mu_y', 'sigma_y', 'rho', 'rho_j', 'mu_v', 'lambda', 'LL'};
-writetable(T, fullfile(folder_name,'p_parameters_trace.csv'));
-
-
-% T_tmp: save one P-measure posterior mean for all 90 days
-
-% 90-day dates
-date_p = dates_filtered;   % size should be 90 x 1
-
-% Posterior means after burn-in / final posterior mean
-V0_p       = outputs.V0;
-mu_p       = outputs.mu;
-alpha_p    = outputs.alpha;
-beta_p     = outputs.beta;
-sigma_v_p  = outputs.sigma_v;
-mu_y_p     = outputs.mu_y;
-sigma_y_p  = outputs.sigma_y;
-rho_p      = outputs.rho;
-rho_j_p    = outputs.rho_j;
-mu_v_p     = outputs.mu_v;
-lambda_p   = outputs.lambda;
-
-% Repeat the same posterior mean for each date
+date_p = dates_filtered;
 n_dates = length(date_p);
 
-T_tmp = table( ...
-    date_p, ...
-    repmat(mu_p,      n_dates, 1), ...
-    repmat(rho_p,     n_dates, 1), ...
-    repmat(alpha_p,   n_dates, 1), ...
-    repmat(beta_p,    n_dates, 1), ...
-    repmat(V0_p,      n_dates, 1), ...
-    repmat(sigma_v_p, n_dates, 1), ...
-    repmat(lambda_p,  n_dates, 1), ...
-    repmat(mu_y_p,    n_dates, 1), ...
-    repmat(rho_j_p,   n_dates, 1), ...
-    repmat(sigma_y_p, n_dates, 1), ...
-    repmat(mu_v_p,    n_dates, 1), ...
-    'VariableNames', {'date','mu','rho','alpha','beta','V0','sigma_v', ...
-                      'lambda','mu_y','rho_j','sigma_y','mu_v'} ...
-);
+switch control.model
+    case 'BS'
+        model_param_names = {'mu','V0','sigma_BS'};
 
+    case 'SV'
+        model_param_names = {'mu','rho','alpha','beta','V0','sigma_v'};
+
+    case 'SVJ'
+        model_param_names = {'mu','rho','alpha','beta','V0','sigma_v', ...
+                             'lambda','mu_y','sigma_y'};
+
+    case 'SVCJ'
+        model_param_names = {'mu','rho','alpha','beta','V0','sigma_v', ...
+                             'lambda','mu_y','rho_j','sigma_y','mu_v'};
+
+    otherwise
+        error('Unknown model for P parameter output: %s', control.model);
+end
+
+posterior = struct();
+posterior.mu       = outputs.mu;
+posterior.rho      = outputs.rho;
+posterior.alpha    = outputs.alpha;
+posterior.beta     = outputs.beta;
+posterior.V0       = outputs.V0;
+posterior.sigma_v  = outputs.sigma_v;
+posterior.lambda   = outputs.lambda;
+posterior.mu_y     = outputs.mu_y;
+posterior.rho_j    = outputs.rho_j;
+posterior.sigma_y  = outputs.sigma_y;
+posterior.mu_v     = outputs.mu_v;
+posterior.sigma_BS = sqrt(max(outputs.V0, 0));
+
+trace = struct();
+trace.mu       = outputs.mu_trace';
+trace.rho      = outputs.rho_trace';
+trace.alpha    = outputs.alpha_trace';
+trace.beta     = outputs.beta_trace';
+trace.V0       = outputs.V0_trace';
+trace.sigma_v  = outputs.sigma_v_trace';
+trace.lambda   = outputs.lambda_trace';
+trace.mu_y     = outputs.mu_y_trace';
+trace.rho_j    = outputs.rho_j_trace';
+trace.sigma_y  = outputs.sigma_y_trace';
+trace.mu_v     = outputs.mu_v_trace';
+trace.sigma_BS = sqrt(max(outputs.V0_trace', 0));
+
+T = table();
+for j = 1:length(model_param_names)
+    name = model_param_names{j};
+    T.(name) = trace.(name);
+end
+T.LL = outputs.LL_trace_last';
+writetable(T, fullfile(folder_name,'p_parameters_trace.csv'));
+
+T_tmp = table(date_p, 'VariableNames', {'date'});
+for j = 1:length(model_param_names)
+    name = model_param_names{j};
+    T_tmp.(name) = repmat(posterior.(name), n_dates, 1);
+end
 writetable(T_tmp, fullfile(folder_name, 'p_parameter_tmp.csv'));
 
-
-
-% T1: parameters (posterior mean)
-T1=table(outputs.V0', outputs.mu', outputs.mu_y', outputs.sigma_y', ...
-outputs.lambda', outputs.alpha', outputs.beta', outputs.rho', ...
-outputs.sigma_v', outputs.rho_j', outputs.mu_v, outputs.LL);
-T1.Properties.VariableNames = {'V0', 'mu', 'mu_y', 'sigma_y', 'lambda', 'alpha', 'beta', 'rho', 'sigma_v', 'rho_j', 'mu_v', 'LL'};
+T1 = table();
+for j = 1:length(model_param_names)
+    name = model_param_names{j};
+    T1.(name) = posterior.(name);
+end
+T1.LL = outputs.LL;
 writetable(T1, fullfile(folder_name,'p_parameter.csv'));
 
 % T2: Latent Variable to latent_trace.csv
@@ -174,9 +190,11 @@ T4.Properties.VariableNames = {'LL'};
 writetable(T4, fullfile(folder_name,'LL_trace.csv'));
 
 % T5: J trace to J_trace.csv
-T5=table(outputs.J_trace);
-T5.Properties.VariableNames = {'J_trace'};
-writetable(T5, fullfile(folder_name,'J_trace.csv'));
+if ismember(control.model, {'SVJ','SVCJ'})
+    T5=table(outputs.J_trace);
+    T5.Properties.VariableNames = {'J_trace'};
+    writetable(T5, fullfile(folder_name,'J_trace.csv'));
+end
 
 % T6: Accept Rate to acceptRate.csv
 T6=table(outputs.acceptV0, outputs.acceptrho, outputs.accepts2V, outputs.acceptV);
@@ -201,57 +219,27 @@ folder_to_save = folder_name;
 plot_trace = @(data, title_str, fname, path) ...
     save_plot_func(data, title_str, fname, path);
 
-% 1. Mu (Mean Return)
-if isfield(outputs, 'mu_trace')
-    plot_trace(outputs.mu_trace, '\mu (Mean Return)', 'mu_plot.png', folder_to_save);
+plot_meta = struct();
+plot_meta.mu       = {'\mu (Mean Return)', 'mu_plot.png'};
+plot_meta.rho      = {'\rho (Leverage Effect)', 'rho_plot.png'};
+plot_meta.alpha    = {'\alpha', 'alpha_plot.png'};
+plot_meta.beta     = {'\beta', 'beta_plot.png'};
+plot_meta.V0       = {'V0', 'V0_plot.png'};
+plot_meta.sigma_v  = {'\sigma_v (Vol of Vol)', 'sig_v_plot.png'};
+plot_meta.lambda   = {'\lambda (Jump Intensity)', 'lambda_plot.png'};
+plot_meta.mu_y     = {'\mu_y (Jump Size Mean)', 'mu_y_plot.png'};
+plot_meta.rho_j    = {'\rho_j (Jump Correlation)', 'rho_j_plot.png'};
+plot_meta.sigma_y  = {'\sigma_y (Jump Size Vol)', 'sig_y_plot.png'};
+plot_meta.mu_v     = {'\mu_v (Vol Jump Mean)', 'mu_v_plot.png'};
+plot_meta.sigma_BS = {'\sigma_{BS}', 'sigma_BS_plot.png'};
+
+for j = 1:length(model_param_names)
+    name = model_param_names{j};
+    meta = plot_meta.(name);
+    plot_trace(trace.(name), meta{1}, meta{2}, folder_to_save);
 end
 
-% 2. Alpha (Mean Reversion Level component)
-if isfield(outputs, 'alpha_trace')
-    plot_trace(outputs.alpha_trace, '\alpha', 'alpha_plot.png', folder_to_save);
-end
-
-% 3. Beta (Mean Reversion Speed component)
-if isfield(outputs, 'beta_trace')
-    plot_trace(outputs.beta_trace, '\beta', 'beta_plot.png', folder_to_save);
-end
-
-% 4. Sigma_v (Vol of Vol)
-if isfield(outputs, 'sigma_v_trace')
-    plot_trace(outputs.sigma_v_trace, '\sigma_v (Vol of Vol)', 'sig_v_plot.png', folder_to_save);
-end
-
-% 5. Rho (Correlation)
-if isfield(outputs, 'rho_trace')
-    plot_trace(outputs.rho_trace, '\rho (Leverage Effect)', 'rho_plot.png', folder_to_save);
-end
-
-% 6. Mu_y (Jump Size Mean)
-if isfield(outputs, 'mu_y_trace')
-    plot_trace(outputs.mu_y_trace, '\mu_y (Jump Size Mean)', 'mu_y_plot.png', folder_to_save);
-end
-
-% 7. Sigma_y (Jump Size Volatility)
-if isfield(outputs, 'sigma_y_trace')
-    plot_trace(outputs.sigma_y_trace, '\sigma_y (Jump Size Vol)', 'sig_y_plot.png', folder_to_save);
-end
-
-% 8. Rho_j (Jump Correlation)
-if isfield(outputs, 'rho_j_trace')
-    plot_trace(outputs.rho_j_trace, '\rho_j (Jump Correlation)', 'rho_j_plot.png', folder_to_save);
-end
-
-% 9. Mu_v (Volatility Jump Mean)
-if isfield(outputs, 'mu_v_trace')
-    plot_trace(outputs.mu_v_trace, '\mu_v (Vol Jump Mean)', 'mu_v_plot.png', folder_to_save);
-end
-
-% 10. Lambda (Jump Intensity)
-if isfield(outputs, 'lambda_trace')
-    plot_trace(outputs.lambda_trace, '\lambda (Jump Intensity)', 'lambda_plot.png', folder_to_save);
-end
-
-% 11. LL
+% LL
 if isfield(outputs, 'LL_trace')
     plot_trace(outputs.LL_trace, 'LL (likelihood)', 'LL_plot.png', folder_to_save);
 end
