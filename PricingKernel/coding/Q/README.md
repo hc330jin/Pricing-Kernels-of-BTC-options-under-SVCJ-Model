@@ -1,6 +1,7 @@
 * Ref: https://github.com/QuantLet/Deribit_inverse_BTC_options/tree/main
 * Code Revision: Chin HSU (hc330.sc14@nycu.edu.tw)
 # Q
+Deribit_20220101.csv only contains Deribit options data for that day. 
 ## Main functions
 | Index | Filename | Description |
 | -------- | -------- | -------- |
